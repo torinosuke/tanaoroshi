@@ -191,8 +191,9 @@
         
         // 数量入力フォームにフォーカスを当ててキーボードを立ち上げる
         const qtyInput = document.getElementById('inputQty');
-        qtyInput.value = "";
+        qtyInput.value = "0";
         qtyInput.focus();
+        qtyInput.select();
     }
 
     // 数量入力中に「Enter」キーが押されたらリストへ追加する（操作性向上）
