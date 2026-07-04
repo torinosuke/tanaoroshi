@@ -152,7 +152,7 @@
     function startExternalScan() {
         const currentUrl = window.location.href.split('?')[0]; 
         const callbackUrl = `${currentUrl}?code={_QR_}`;
-        const iconitUrl = `https://s.iconit.jp/r?url=${encodeURIComponent(callbackUrl)}`;
+        const iconitUrl = `iconit://scan?url=${encodeURIComponent(callbackUrl)}`;
         window.location.href = iconitUrl;
     }
 
