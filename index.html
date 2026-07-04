@@ -54,7 +54,8 @@
 
     <div id="step2" class="hidden">
         <h3>② 在庫スキャン</h3>
-        <button class="btn-blue" onclick="window.open('iconit://')">📷 ICONITを起動</button>
+        <!-- 【修正箇所】正しくユニバーサルリンクを生成する関数を呼び出すように変更 -->
+        <button class="btn-blue" onclick="startExternalScan()">📷 ICONITを起動</button>
         <div id="scanResult">
             <span id="displayCode" style="font-size:0.8rem; color:#666;"></span>
             <span id="displayName" class="drug-name">ここに薬品名が表示されます</span>
@@ -91,12 +92,10 @@
 </div>
 
 <script>
-    let masterData = {}; // JANコード/GS1コード: 薬品名
-    let scannedList = []; // スキャン結果のデータ配列
+    let masterData = {}; 
+    let scannedList = []; 
 
-    // --- ページ読み込み時の初期化処理（データ復元とURLパラメータチェック） ---
     window.addEventListener('DOMContentLoaded', () => {
-        // 1. ローカルストレージからマスタデータを復元
         const savedMaster = localStorage.getItem('masterData');
         if (savedMaster) {
             masterData = JSON.parse(savedMaster);
@@ -105,26 +104,21 @@
             document.getElementById('step2').classList.remove('hidden');
         }
 
-        // 2. ローカルストレージからスキャン済みリストを復元
         const savedList = localStorage.getItem('scannedList');
         if (savedList) {
             scannedList = JSON.parse(savedList);
             updateTable();
         }
 
-        // 3. 外部アプリからバーコードデータが返ってきたかチェック
         const urlParams = new URLSearchParams(window.location.search);
         const codeFromApp = urlParams.get('code');
 
         if (codeFromApp) {
-            // スキャン成功処理を実行
             onScanSuccess(codeFromApp);
-            // URLの見栄えを綺麗にするため、パラメータ（?code=xxx）をブラウザ履歴から消去
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     });
 
-    // --- 1. CSV（マスタ）読み込み処理 ---
     document.getElementById('csvFile').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -132,11 +126,10 @@
         Papa.parse(file, {
             encoding: "Shift-JIS",
             complete: function(results) {
-                masterData = {}; // 一度初期化
+                masterData = {}; 
                 results.data.forEach(row => {
                     if(row.length >= 2 && row[0]) {
                         const rawCode = row[0].trim();
-                        // GS1対策：先頭の「01」を削ったコードでも検索できるように二重登録
                         const cleanCode = rawCode.replace(/^01/, ''); 
                         
                         masterData[rawCode] = row[1].trim();
@@ -146,7 +139,6 @@
                     }
                 });
                 
-                // ローカルストレージにマスタを保存
                 localStorage.setItem('masterData', JSON.stringify(masterData));
                 
                 document.getElementById('masterStatus').innerText = `✅ 読込完了: ${Object.keys(masterData).length}件`;
@@ -156,27 +148,17 @@
         });
     });
 
-    // --- 2. 外部アプリ（アイコニット）起動処理 ---
     function startExternalScan() {
-        // パラメータを除いた現在のアプリのURLを取得
         const currentUrl = window.location.href.split('?')[0]; 
-        
-        // スキャン後に戻ってくるURLを設定 ({_QR_}部分に読み取り結果が入る)
         const callbackUrl = `${currentUrl}?code={_QR_}`;
-        
-        // アイコニット呼び出し用のユニバーサルリンク
         const iconitUrl = `https://s.iconit.jp/r?url=${encodeURIComponent(callbackUrl)}`;
-        
-        // アプリへ切り替え
         window.location.href = iconitUrl;
     }
 
-    // --- 3. バーコード取得後の処理 ---
     function onScanSuccess(decodedText) {
         let searchCode = decodedText.trim();
         let name = masterData[searchCode];
 
-        // 医薬品GS1コード対応：ヒットしなかった場合、先頭の「01」(14桁以上のGS1識別子)を外して再照合
         if (!name && searchCode.startsWith("01") && searchCode.length >= 14) {
             searchCode = searchCode.substring(2);
             name = masterData[searchCode];
@@ -184,12 +166,10 @@
         
         name = name || "マスタ未登録の薬品";
         
-        // 数量入力エリアの表示と値のセット
         document.getElementById('scanResult').style.display = "block";
         document.getElementById('displayCode').innerText = decodedText;
         document.getElementById('displayName').innerText = name;
         
-        // 数量入力フォームにフォーカスを当ててキーボードを立ち上げる
         const qtyInput = document.getElementById('inputQty');
         qtyInput.value = "0";
 
@@ -197,14 +177,12 @@
         qtyInput.select();
     }
 
-    // 数量入力中に「Enter」キーが押されたらリストへ追加する（操作性向上）
     document.getElementById('inputQty').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             addToList();
         }
     });
 
-    // --- 4. リスト追加・重複チェック処理 ---
     function addToList() {
         const code = document.getElementById('displayCode').innerText;
         const name = document.getElementById('displayName').innerText;
@@ -213,23 +191,20 @@
         if(!qtyStr) { alert("数量を入力してください"); return; }
         const qty = parseFloat(qtyStr);
 
-        // リスト内に同じコードの薬品がすでに存在するか確認
         const existingItem = scannedList.find(item => item.code === code);
         if (existingItem) {
-            // 存在すれば数量を加算
             existingItem.qty = Number(existingItem.qty) + qty;
         } else {
-            // 新規であればリストに追加
             scannedList.push({ code, name, qty });
         }
         
-        // ローカルストレージにデータを保存
         localStorage.setItem('scannedList', JSON.stringify(scannedList));
         
         updateTable();
         clearInput();
         
-        window.location.href = "iconit://";
+        // 【修正箇所】ただアプリを開くのではなく、戻りURLを仕込んだ状態で再起動させる
+        startExternalScan();
     }
 
     function clearInput() {
@@ -237,7 +212,6 @@
         document.getElementById('inputQty').value = "";
     }
 
-    // テーブル表示の更新
     function updateTable() {
         const tbody = document.querySelector('#listTable tbody');
         tbody.innerHTML = "";
@@ -249,12 +223,10 @@
         document.getElementById('count').innerText = scannedList.length;
     }
 
-    // エスケープ処理（安全対策）
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // 次の棚卸のためのデータ全削除ボタン
     function clearAllData() {
         if (confirm("スキャン済みのリストとマスタデータをすべて消去します。よろしいですか？")) {
             localStorage.clear();
@@ -268,18 +240,15 @@
         }
     }
 
-    // --- 5. CSV出力処理 ---
     function downloadCSV() {
         if(scannedList.length === 0) { alert("データがありません"); return; }
         
         let csvContent = "コード,薬品名,数量\n";
         scannedList.forEach(item => {
-            // 薬品名の中の「,」や「"」でCSVの列がズレないようにダブルクォーテーションで保護
             const safeName = item.name.replace(/"/g, '""');
             csvContent += `"${item.code}","${safeName}",${item.qty}\n`;
         });
 
-        // Excelで開いても文字化けしないように「BOM（UTF-8）」を付与して出力
         const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
         const blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
         const url = window.URL.createObjectURL(blob);
